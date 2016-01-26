@@ -5,6 +5,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from sklearn import metrics
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import GaussianNB
+from sklearn.ensemble import AdaBoostClassifier
+from sklearn.svm import SVC
 
 import dfmaker
 import modelmaker
@@ -124,26 +128,27 @@ def DrawBestWords(trained_model,trained_vocab, trained_tag_vocab, title):
     plt.title('Most Important Words: %s Spoilers' % title,fontsize='large')
 
 
-def Test_A_Model(tag, model, vocab1,vocab2,title,myconfig):
-
-    print "NOW TESTING:",tag
+def Train_A_Model(tag, model, vocab1,vocab2,myconfig):
 
     df_all = dfmaker.get_train_dfs(tag,myconfig)
     df_Train, df_Test = dfmaker.GenerateTestTrain(df_all)
 
-    #Test with cross-validation:
-    modelmaker.model_cv(df_all,model,vocab1,vocab2)
-    #print "Mean AUC = %d, Std = %d" % (mean_auc,std_auc)
-
     #Train the actual model:
     trained_model,trained_vocab,tagged_vocab = modelmaker.model_trainer(df_Train,model,vocab1,vocab2)
 
+    #Get predictions
     result = modelmaker.model_tester(df_Test,trained_model,trained_vocab,tagged_vocab)
-    DrawROCandThresh(df_Test,result,title)
-    #DrawScatter(df_Test,result,title)
-    DrawBestWords(trained_model,trained_vocab,tagged_vocab,title)
 
-    return trained_model, trained_vocab, result, df_Test
+    return trained_model, trained_vocab, tagged_vocab, result, df_Test
+
+def CV_A_Model(tag, model, vocab1,vocab2,myconfig):
+
+    df_all = dfmaker.get_train_dfs(tag,myconfig)
+    df_Train, df_Test = dfmaker.GenerateTestTrain(df_all)
+    
+    #Test with cross-validation:
+    modelmaker.model_cv(df_all,model,vocab1,vocab2)
+
 
 #def Test_Front_Model(tag, nolist, model, vocab1,vocab2,title,myconfig):
 #

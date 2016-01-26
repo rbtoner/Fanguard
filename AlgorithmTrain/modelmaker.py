@@ -44,13 +44,16 @@ def make_features(v1,v2,df):
 
 def model_trainer(df_train,model,v1,v2):
 
+    #Features:
     x = make_features(v1,v2,df_train)
-    
+
+    #Labels:
     y = df_train['evtclass']
-    
+
+    #Fit the model:    
     model = model.fit(x, y)
-    
-    return model, v1, v2
+
+    return model,v1,v2
 
 def model_cv(df,model,v1,v2,n_folds=5):
     
@@ -77,17 +80,20 @@ def model_tester(df_test,model,v1,v2):
     #Word list::
     corpus_train1 = df_test['words']
     x1 = v1.transform(corpus_train1).toarray()
-    
+
     #Tag list:
     corpus_train2 = df_test['taglist']
     x2 = v2.transform(corpus_train2).toarray()
     
+    #Text length:
     f_wcount = df_test['wcount'].values
     fl = f_wcount.reshape(len(f_wcount),1)
-    
+
+    #Features vector
     x = np.hstack([x1,x2,fl])  
-    
+
+    #Result:
     result_p = (model.predict_proba(x))[:,1]
-    
+
     return result_p
 
