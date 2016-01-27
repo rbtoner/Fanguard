@@ -32,39 +32,47 @@ def PostGenerator(client, tag, timelist = [],rep = 1):
     #For as long as we need to:
     while True:
 
+        if (i%rep==0) and (len(timelist)>0):
+
+            if (last_stamp < timelist[j]):
+                print "WARNING: %d < %d; will later drop duplicates" \
+                    % (last_stamp,timelist[j])
+
+            new_before = timelist[j] - 1
+            j += 1
+
+        else:
+            new_before = last_stamp
+
         #Print out some progress every 20 calls:
         if (i%20)==0:
             print "%d..." % i,
 
         #Only more recent than start of Jan, 2013:
-        if (last_stamp < 1356998400):
+        if (new_before < 1356998400):
+            print "Past date"
             yield None, 0, 0
         
         #Posts with tag, starting at last_stamp:
-        posts = client.tagged(tag, limit=chunk, before=last_stamp)
+        #print "Looking before",new_before
+        posts = client.tagged(tag, limit=chunk, before=new_before)
         #print i,j,last_stamp
         
         #Didn't get anything
         if not posts:
+            print "Out of posts"
             yield None, 0, 0
-
-        elapsed = posts[0]['timestamp'] - posts[len(posts)-1]['timestamp']
-        
-        #Reset the time stamp to that of the oldest:
-        if (len(timelist)>0) and (i%rep==rep-1):
-            last_stamp = timelist[j]-1
-        else :
+        else:
+            elapsed = posts[0]['timestamp'] - posts[len(posts)-1]['timestamp']
+            #print "First post at %d, last post at %d" % (posts[0]['timestamp'],posts[len(posts)-1]['timestamp'])
+            #Reset the time stamp to that of the oldest:
             last_stamp = posts[len(posts)-1]['timestamp']
+            #YIELD
+            yield posts,last_stamp,[elapsed/len(posts)]*len(posts)
 
         #Counters:
         i += 1
-        #Iterate at given reprate point:
-        if (i%rep==0) and (i>0):
-            j += 1
         
-        
-        #YIELD
-        yield posts,last_stamp,[elapsed/len(posts)]*len(posts)
 
 def GeneratePosts(tag,dbname,reprate,myconfig):
 
@@ -91,10 +99,11 @@ def GeneratePosts(tag,dbname,reprate,myconfig):
     spo_gen = PostGenerator(client,"%s-spoilers" % tag)
 
     time_list = [] #List of timestamp to match with regular
+
     dtime_spo = [] #weights (if needed)
 
-    #First, grab the total posts (up to 2000 worth):
-    for _ in range(0,2000):
+    #First, grab the total posts (up to 1000 worth):
+    for _ in range(0,1000):
         
         time.sleep(0.1) #Don't hit the API rate limit
 
@@ -112,12 +121,14 @@ def GeneratePosts(tag,dbname,reprate,myconfig):
         time_list.append(ts)
         dtime_spo += te
 
+    #print time_list
+        
     #How much time is represented by the API call?
     print "Total elapsed time (spoilers) =", \
       np.asarray(dtime_spo, dtype=float).sum()
 
     #Generator to grab posts from regular tag:
-    all_gen = PostGenerator(client,"star-wars",time_list,reprate)
+    all_gen = PostGenerator(client,tag,time_list,reprate)
 
     #Timelist and stamps:
     dtime_all=[] 
@@ -130,17 +141,20 @@ def GeneratePosts(tag,dbname,reprate,myconfig):
 
         #Grab posts, plus stamp and elapsed information
         posts,ts,te = all_gen.next()
-
+        #print ts
         #When we're out of posts:
-        if not posts:
-            break
-        
-        #Append list of posts:
-        all_posts += posts
+        #if not posts:
+        #    break
 
-        #Time info:
-        stamps.append(ts)
-        dtime_all += te
+        if posts:
+            #Append list of posts:
+            all_posts += posts
+            #Time info:
+            stamps.append(ts)
+            dtime_all += te
+        else:
+            print "(GAP)"
+
     
     print "Total elapsed time (all posts) =", \
       np.asarray(dtime_all, dtype=float).sum()
@@ -178,9 +192,11 @@ def GeneratePosts(tag,dbname,reprate,myconfig):
     print "Done generating trees."
 
     #Remove duplicates:
+    print "Sizes before duplicate dropping:", dsql_spo.shape,dsql_all.shape
     dsql_spo = dsql_spo.drop_duplicates()
     dsql_all = dsql_all.drop_duplicates()
-
+    print "Sizes after duplicate dropping:", dsql_spo.shape,dsql_all.shape
+    
     #Connection to DB:
     engine = create_engine("mysql+mysqldb://%s:%s@localhost/InsightData" % (db_username,db_pwd))
 

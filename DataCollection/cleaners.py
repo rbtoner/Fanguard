@@ -21,7 +21,7 @@ def make_text(x,wtitle=True):
     elif x['type'] == 'answer':
         tot_txt = x['question'] + x['answer']
     elif x['type'] == 'chat':
-        tot_txt = x['text']
+        tot_txt = ""#x['text']
 
     soup = BeautifulSoup(tot_txt,'html')
         
