@@ -51,6 +51,7 @@ def get_train_dfs(dbtag,myconfig):
     db_pwd = config.get('DB', 'pwd')
     
     #DB connection:
+    #con = mdb.connect('localhost', db_username, db_pwd, 'testdb')
     con = mdb.connect('localhost', db_username, db_pwd, 'InsightData')
     
     query = 'SELECT * FROM tumblr_%s_spoil' % dbtag
@@ -124,12 +125,76 @@ def GenerateTestTrain(df):
     
     return df_tr,df_te
 
-#def get_nolist_dfs(tag,nolist,myconfig):
-#
-#    df_ip = dfmaker.get_train_dfs(tag,myconfig)
-#    df_ip['evtclass'] = np.ones(df_ip.shape[0])
-#
-#    df_noip = pd.DataFrame()
-#    for t in nolist:
+def get_nolist_dfs(tag,nolist,myconfig):
 
-        
+    df_ip = get_train_dfs(tag,myconfig)
+    df_ip['evtclass'] = np.zeros(df_ip.shape[0])
+    df_tot = df_ip.drop_duplicates()
+    
+    for i,t in enumerate(nolist):
+        df_ = get_train_dfs(t,myconfig)
+        df_ = df_.drop_duplicates()
+        df_['evtclass'] = np.full(df_.shape[0],i+1)
+        df_tot = pd.concat([df_tot,df_],ignore_index=True)
+
+    return df_tot
+
+def GenerateTestTrainFront(df,itest):
+
+    #print "Total size",df.shape
+    
+    df = shuffle(df,random_state=15)
+
+    df_test_noip = df[df['evtclass']==itest]
+
+    #print "No IP test shape",df_test_noip.shape
+    
+    df_train = df[df['evtclass']!=itest]
+
+    #print "Everything except MIP:",df_train.shape
+    
+    df_ip = df_train[df_train['evtclass']==0]
+
+    #print "Total IP only:",df_ip.shape
+    
+    df_train_noip = df_train[df_train['evtclass']!=0]
+
+    #print "Total No IP train",df_train_noip.shape
+    
+    X_ip_train, X_ip_test, y_ip_train, y_ip_test = \
+      cross_validation.train_test_split( \
+            df_ip[['words','w','taglist','wcount']], \
+            df_ip['evtclass'], test_size=0.4, \
+            random_state=0)
+
+    df_tr_ip = pd.concat([X_ip_train, y_ip_train], axis=1, join_axes=[X_ip_train.index])
+
+    #print "Train IP type",type(df_tr_ip)
+    #print "Train IP size",df_tr_ip.shape
+
+    df_tr_ip['evtclass'] = np.ones(df_tr_ip.shape[0])
+    df_train_noip['evtclass'] = np.zeros(df_train_noip.shape[0])   
+
+    df_tr = pd.concat([df_tr_ip,df_train_noip],ignore_index=True)
+    df_tr = df_tr.reset_index()
+    df_tr = shuffle(df_tr,random_state=15)
+
+    #print "Total Train type",type(df_tr)
+    #print "Total Train size",df_tr.shape
+
+    df_te_ip = pd.concat([X_ip_test, y_ip_test], axis=1, join_axes=[X_ip_test.index])
+
+    #print "Test IP type",type(df_te_ip)
+    #print "Test IP size",df_te_ip.shape
+
+    df_te_ip['evtclass'] = np.ones(df_te_ip.shape[0])
+    df_test_noip['evtclass'] = np.zeros(df_test_noip.shape[0]) 
+    
+    df_te = pd.concat([df_te_ip,df_test_noip],ignore_index=True)
+    df_te = df_te.reset_index()
+    df_te = shuffle(df_te,random_state=15)   
+
+    #print "Total Test type",type(df_te)
+    #print "Total Test size",df_te.shape
+    
+    return df_tr,df_te

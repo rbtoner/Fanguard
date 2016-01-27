@@ -3,6 +3,7 @@ from __future__ import division
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 
 from sklearn import metrics
 from sklearn.ensemble import RandomForestClassifier
@@ -26,7 +27,29 @@ def DrawROCandThresh(df,result_prob,title):
     #print y_real.shape
     #print y_score.shape
     fpr, tpr, thresh = metrics.roc_curve(y_real, y_score, pos_label=1,sample_weight=weights)
-        
+
+    got60=False
+    got80=False
+    got90=False
+    dict_cuts={}
+    
+    for i,t in enumerate(thresh):
+
+        if tpr[i] > 0.60 and t<1 and not got60:
+            print "TP=60p: thresh=%f, FP=%f" % (t,fpr[i])
+            got60=True
+            dict_cuts['60p']=t
+
+        if tpr[i] > 0.80 and t<1 and not got80:
+            print "TP=80p: thresh=%f, FP=%f" % (t,fpr[i])
+            got80=True
+            dict_cuts['80p']=t
+            
+        if tpr[i] > 0.90 and t<1 and not got90:
+            print "TP=90p: thresh=%f, FP=%f" % (t,fpr[i])
+            got90=True
+            dict_cuts['90p']=t
+    
     roc_auc = metrics.auc(fpr, tpr,reorder=True)
     
     plt.figure()
@@ -51,7 +74,7 @@ def DrawROCandThresh(df,result_prob,title):
     plt.legend(loc="lower left")
     plt.show()
     
-    #return tpr, fpr, thresholds
+    return dict_cuts
 
 def DrawScatter(df_Test, result,title):
     plt.rcParams['figure.figsize'] = (8.0, 6.0)
@@ -127,11 +150,7 @@ def DrawBestWords(trained_model,trained_vocab, trained_tag_vocab, title):
     plt.ylabel('Importance to Model',fontsize='large')
     plt.title('Most Important Words: %s Spoilers' % title,fontsize='large')
 
-
-def Train_A_Model(tag, model, vocab1,vocab2,myconfig):
-
-    df_all = dfmaker.get_train_dfs(tag,myconfig)
-    df_Train, df_Test = dfmaker.GenerateTestTrain(df_all)
+def Train_A_Model_Direct(tag, model, vocab1,vocab2,df_Train,df_Test):
 
     #Train the actual model:
     trained_model,trained_vocab,tagged_vocab = modelmaker.model_trainer(df_Train,model,vocab1,vocab2)
@@ -141,15 +160,48 @@ def Train_A_Model(tag, model, vocab1,vocab2,myconfig):
 
     return trained_model, trained_vocab, tagged_vocab, result, df_Test
 
-def CV_A_Model(tag, model, vocab1,vocab2,myconfig):
+    
+def Train_A_Model(tag, model, vocab1,vocab2,myconfig,downsample=True):
 
     df_all = dfmaker.get_train_dfs(tag,myconfig)
     df_Train, df_Test = dfmaker.GenerateTestTrain(df_all)
+
+    #Train the actual model:
+    trained_model,trained_vocab,tagged_vocab = modelmaker.model_trainer(df_Train,model,vocab1,vocab2,downsample)
+
+    #Get predictions
+    result = modelmaker.model_tester(df_Test,trained_model,trained_vocab,tagged_vocab)
+
+    return trained_model, trained_vocab, tagged_vocab, result, df_Test
+
+def GetDFs(tag,myconfig):
+    df_all = dfmaker.get_train_dfs(tag,myconfig)
+    df_Train, df_Test = dfmaker.GenerateTestTrain(df_all)
+    return df_all, df_Train, df_Test
+
+def CV_A_Model(model, vocab1,vocab2,df,nfold=5,downsample=True):
+
+    start_time = time.time()
+    #Test with cross-validation:
+    modelmaker.model_cv(df,model,vocab1,vocab2,nfold,downsample)
+    print "Time elapsed:",(time.time() - start_time)
+    
+def CV_A_Model_FromSQL(tag, model, vocab1,vocab2,myconfig,nfold=5,downsample=True):
+
+    df_all = dfmaker.get_train_dfs(tag,myconfig,downsample)
+    df_Train, df_Test = dfmaker.GenerateTestTrain(df_all)
     
     #Test with cross-validation:
-    modelmaker.model_cv(df_all,model,vocab1,vocab2)
+    modelmaker.model_cv(df_Train,model,vocab1,vocab2,nfold,downsample)
 
+def CV_FrontFilter(model, nolist, vocab1,vocab2,myconfig,nfold=5,downsample=True):
 
+    df_all = dfmaker.get_nolist_dfs(tag,nolist,myconfig)
+
+    for itest in range(1,len(nolist)+1):
+        df_Test,df_Train = dfmaker.GenerateTestTrainFront(df,itest)
+        Train_A_Model_Direct(tag, model, vocab1,vocab2,df_Train,df_Test)
+        
 #def Test_Front_Model(tag, nolist, model, vocab1,vocab2,title,myconfig):
 #
 #    print "NOW TESTING:",tag
