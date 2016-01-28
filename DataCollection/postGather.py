@@ -64,6 +64,8 @@ def PostGenerator(client, tag, timelist = [],rep = 1):
             yield None, 0, 0
         else:
             elapsed = posts[0]['timestamp'] - posts[len(posts)-1]['timestamp']
+            if elapsed < 0:
+                print "WARNING: final %d < initial %d" % (posts[len(posts)-1]['timestamp'], posts[0]['timestamp'])
             #print "First post at %d, last post at %d" % (posts[0]['timestamp'],posts[len(posts)-1]['timestamp'])
             #Reset the time stamp to that of the oldest:
             last_stamp = posts[len(posts)-1]['timestamp']
@@ -241,3 +243,55 @@ def GeneratePosts(tag,dbname,reprate,myconfig):
                     if_exists='replace',index=True)
     print "Done..."
     print "FINISHED"
+
+def FrontendGetPosts(tag,npost,myconfig):
+
+    config = ConfigParser.RawConfigParser()
+    config.read(myconfig) 
+
+    #MySQL info:
+    db_username = config.get('DB', 'username')
+    db_pwd = config.get('DB', 'pwd')
+
+    consumer_key = config.get('tcred', 'consumer_key')
+    consumer_secret = config.get('tcred', 'consumer_secret')
+    oauth_token = config.get('tcred', 'oauth_token')
+    oauth_secret = config.get('tcred', 'oauth_secret')
+    
+    client = pytumblr.TumblrRestClient(consumer_key,consumer_secret, \
+        oauth_token, oauth_secret)
+    
+    #Lists to hold all the posts:
+    all_posts = []
+    
+    #Generator to grab posts from spoiler tag:
+    post_gen = PostGenerator(client,tag)
+    
+    post_lim = int(npost/20)
+    
+    #First, grab the total posts (up to 1000 worth):
+    for _ in range(0,post_lim):
+        
+        #Grab posts, plus stamp and elapsed information
+        posts,ts,te = post_gen.next()
+
+        #When we're out of posts:
+        if not posts:
+            break
+        
+        #Append list of posts:
+        all_posts += posts
+
+    df_all = pd.DataFrame(all_posts)
+    df_all = df_all.replace(np.nan,' ', regex=True)
+
+    df = df_all[['id']].copy()
+    df.loc[:,'words'] = df_all.apply(cleaners.cleaner,axis=1)
+    df.loc[:,'wcount'] = df_all.apply(cleaners.count,axis=1)
+    df.loc[:,'taglist'] = df_all.apply(cleaners.gather_tags,axis=1)
+    df.loc[:,'blog_name'] = df_all['blog_name'].astype(str)
+    df.loc[:,'date'] = df_all['date']
+    df.loc[:,'note_count'] = df_all['note_count']
+    df.loc[:,'short_url'] = df_all['short_url']
+
+    return df
