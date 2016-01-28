@@ -101,7 +101,7 @@ def model_trainer(df_train,model,v1,v2,downsample=False):
 
 def model_cv(df,model,v1,v2,n_folds=5,downsample=False):
     
-    x,y = make_features(v1,v2,df,downsample) 
+    x,y,v1,v2 = make_features(v1,v2,df,downsample) 
     
     #kf_total = cross_validation.KFold(len(x), n_folds=10, indices=True, shuffle=True, random_state=4)
     kf_total = cross_validation.KFold(len(x), n_folds, shuffle=True, random_state=4)

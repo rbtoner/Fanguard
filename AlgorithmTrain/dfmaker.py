@@ -4,6 +4,7 @@ import numpy as np
 import MySQLdb as mdb
 import pandas as pd
 import re
+from collections import defaultdict
 
 from sklearn import cross_validation
 from sklearn import metrics
@@ -40,7 +41,29 @@ def clean_tags(x):
             
     return tagvals
 
-def get_train_dfs(dbtag,myconfig):
+def enforce_post_limit(df_all):
+
+    post_limit = int(0.0005*(df_all.shape[0]))
+    if post_limit == 0:
+        post_limit = 1
+        
+    auth_select = np.empty(df_all.shape[0],dtype=bool)
+    
+    df_all = shuffle(df_all,random_state=20)
+    auth_count = defaultdict(int)
+    
+    for i in range(0, df_all.shape[0]):
+        bname = df_all.iloc[i]['blogname']
+        auth_count[bname] += 1
+        if auth_count[bname]>post_limit:
+            auth_select[i] = False
+        else :
+            auth_select[i] = True
+
+    df_all = df_all[auth_select]
+    return df_all
+    
+def get_train_dfs(dbtag,myconfig,postlimit=True):
 
     #Grab configs:
     config = ConfigParser.RawConfigParser()
@@ -84,14 +107,16 @@ def get_train_dfs(dbtag,myconfig):
     cols_tot = {'words':words_tot,'evtclass':class_tot,'w':weight_tot,\
                 'wcount':np.asarray(df_tot['count']), \
                 'id':np.asarray(df_tot['id']),  \
+                'blogname':np.asarray(df_tot['blog_name']), \
                 'timestamp':np.asarray(df_tot['timestamp']), \
                 'taglist':np.asarray(df_tot['taglist'])}
                 
     df_new_tot = pd.DataFrame(cols_tot,index=range(1,words_tot.size+1))
 
     cols_spo = {'words':words_spo,'evtclass':class_spo,'w':weight_spo,\
-               'wcount':np.asarray(df_spo['count']), \
-               'id':np.asarray(df_spo['id']),\
+                'wcount':np.asarray(df_spo['count']), \
+                'id':np.asarray(df_spo['id']),\
+                'blogname':np.asarray(df_spo['blog_name']), \
                 'timestamp':np.asarray(df_spo['timestamp']), \
                 'taglist':np.asarray(df_spo['taglist'])}
                 
@@ -105,6 +130,9 @@ def get_train_dfs(dbtag,myconfig):
     std_len = df_new['wcount'].std()
     
     df_new['wcount'] = (df_new['wcount'] - std_len)/avg_len
+
+    if (postlimit):
+       df_new = enforce_post_limit(df_new)
     
     return df_new
 
@@ -125,7 +153,7 @@ def GenerateTestTrain(df):
     
     return df_tr,df_te
 
-def get_nolist_dfs(tag,nolist,myconfig):
+def get_nolist_dfs(tag,nolist,myconfig,binary=False):
 
     df_ip = get_train_dfs(tag,myconfig)
     df_ip['evtclass'] = np.zeros(df_ip.shape[0])
@@ -137,7 +165,17 @@ def get_nolist_dfs(tag,nolist,myconfig):
         df_['evtclass'] = np.full(df_.shape[0],i+1)
         df_tot = pd.concat([df_tot,df_],ignore_index=True)
 
+    if binary:
+        df_1 = df_tot[df_tot['evtclass']==0]
+        df_1['evtclass']=1
+        df_0 = df_tot[df_tot['evtclass']!=0]
+        df_0['evtclass']=0
+        df_tot = pd.concat([df_0,df_1],ignore_index=True)
+        df_tot = shuffle(df_tot,random_state=19)
+        
     return df_tot
+
+
 
 def GenerateTestTrainFront(df,itest):
 

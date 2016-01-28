@@ -174,6 +174,21 @@ def Train_A_Model(tag, model, vocab1,vocab2,myconfig,downsample=True):
 
     return trained_model, trained_vocab, tagged_vocab, result, df_Test
 
+def Train_Final_Model(tag, model, vocab1,vocab2,myconfig,downsample=True):
+
+    df_all = dfmaker.get_train_dfs(tag,myconfig)
+
+    #Check that CV looks fine:
+    print "Checking CV (nfold=2):"
+    modelmaker.model_cv(df_all,model,vocab1,vocab2,2,downsample)
+
+    #Train the actual model:
+    print "Training final model:"
+    trained_model,trained_vocab1,trained_vocab2 = modelmaker.model_trainer(df_all,model,vocab1,vocab2,downsample)
+
+    return trained_model, trained_vocab1, trained_vocab2
+
+
 def GetDFs(tag,myconfig):
     df_all = dfmaker.get_train_dfs(tag,myconfig)
     df_Train, df_Test = dfmaker.GenerateTestTrain(df_all)
