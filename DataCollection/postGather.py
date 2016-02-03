@@ -271,6 +271,8 @@ def FrontendGetPosts(tag,npost,myconfig):
     
     #First, grab the total posts (up to 1000 worth):
     for _ in range(0,post_lim):
+
+        time.sleep(0.1) #Don't hit the API rate limit
         
         #Grab posts, plus stamp and elapsed information
         posts,ts,te = post_gen.next()

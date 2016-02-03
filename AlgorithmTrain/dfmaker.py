@@ -175,10 +175,21 @@ def get_nolist_dfs(tag,nolist,myconfig,binary=False):
         
     return df_tot
 
+def get_all_dfs(tagslist,myconfig,binary=False):
+
+    df_tot = pd.DataFrame()
+        
+    for i,t in enumerate(tagslist):
+        df_ = get_train_dfs(t,myconfig)
+        df_ = df_.drop_duplicates()
+        df_tot = pd.concat([df_tot,df_],ignore_index=True)
+        
+    return df_tot
 
 
-def GenerateTestTrainFront(df,itest):
+def GenerateTestTrainFront(df,itest,downsample=True):
 
+    
     #print "Total size",df.shape
     
     df = shuffle(df,random_state=15)
@@ -234,5 +245,20 @@ def GenerateTestTrainFront(df,itest):
 
     #print "Total Test type",type(df_te)
     #print "Total Test size",df_te.shape
+
+    if downsample:
+
+        #print "Train pre-DS:",df_tr['evtclass'].value_counts()
+        
+        df_class1 = df_tr[df_tr["evtclass"]==1]
+        df_class0 = df_tr[df_tr["evtclass"]==0]
+    
+        size0 = df_class1.shape[0]
+        df_class0 = df_class0.sample(size0)
+        df = pd.concat([df_class1,df_class0],ignore_index=True)
+        df_tr = shuffle(df,random_state=20)
+        
+        #print "Train post-DS:",df_tr['evtclass'].value_counts()
+        #print "Total Train size (DOWNSAMPLED)",df_tr.shape
     
     return df_tr,df_te

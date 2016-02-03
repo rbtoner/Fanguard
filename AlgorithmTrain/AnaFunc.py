@@ -17,7 +17,7 @@ import modelmaker
 def DrawROCandThresh(df,result_prob,title):
        
     plt.rcParams['figure.figsize'] = (8.0, 6.0)
-    plt.rcParams['font.size'] =  15    
+    plt.rcParams['font.size'] =  20    
         
     y_real = df['evtclass']
     y_score = result_prob
@@ -59,7 +59,7 @@ def DrawROCandThresh(df,result_prob,title):
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    plt.title("Cut Threshold versus Selection Rate: %s" % title)
+    plt.title("ROC Curve: %s" % title)
     plt.legend(loc="lower right")
     plt.show()
     
@@ -78,7 +78,7 @@ def DrawROCandThresh(df,result_prob,title):
 
 def DrawScatter(df_Test, result,title):
     plt.rcParams['figure.figsize'] = (8.0, 6.0)
-    plt.rcParams['font.size'] =  15
+    plt.rcParams['font.size'] =  20
     
     str_words = [len(w.split()) for w in df_Test['words']]
     spoiler_index = df_Test[df_Test['evtclass'] == 1].index.tolist()
@@ -134,7 +134,7 @@ def DrawBestWords(trained_model,trained_vocab, trained_tag_vocab, title):
             break
 
     plt.rcParams['figure.figsize'] = (14.0, 6.0)
-    plt.rcParams['font.size'] =  15
+    plt.rcParams['font.size'] =  20
 
     fig = plt.figure()
 
