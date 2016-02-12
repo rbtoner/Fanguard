@@ -13,23 +13,32 @@ from sklearn.utils import shuffle
 import ConfigParser
 
 def is_spoil(x):
+    """Tag text x contains a spoiler or not
+    """
     if 'spoil' in x['taglist'].lower():
         return False
     else:
         return True
     
 def has_spoil(x):
+    """Body text x contains a spoiler or not
+    """
     if 'spoil' in x['alltext'].lower():
         return False
     else:
         return True
     
 def snipspo(x):
+    """Remove 'spoiler' from all body text
+    """
     x = re.sub("\S*[Ss][Pp][Oo][Ii][Ll]\S*","",x)
     return x
         
     
 def clean_tags(x):
+    """Remove 'spoiler' and non-alphanumeric text from tags
+    """
+    
     tagvals=""
     for t in x.split('",'):
         t = re.sub("[^a-zA-Z ]","", t )
@@ -42,17 +51,27 @@ def clean_tags(x):
     return tagvals
 
 def enforce_post_limit(df_all):
+    """Remove posts from ultra-prolific authors in frame df_all
+    """
 
+    #Maximum posts of author = 0.05% of total set of posts
     post_limit = int(0.0005*(df_all.shape[0]))
     if post_limit == 0:
         post_limit = 1
-        
+
+    #Empty vector to hold author decision:
     auth_select = np.empty(df_all.shape[0],dtype=bool)
-    
+
+    #Shuffle!
     df_all = shuffle(df_all,random_state=20)
+
+    #Count of posts per author:
     auth_count = defaultdict(int)
-    
+
+    #Loop and count posts by author.
+    #After post_limit posts, mark posts for removal.
     for i in range(0, df_all.shape[0]):
+        #Author name:
         bname = df_all.iloc[i]['blogname']
         auth_count[bname] += 1
         if auth_count[bname]>post_limit:
@@ -60,11 +79,18 @@ def enforce_post_limit(df_all):
         else :
             auth_select[i] = True
 
+    #Only keep posts marked as to-keep
     df_all = df_all[auth_select]
     return df_all
     
 def get_train_dfs(dbtag,myconfig,postlimit=True):
+    """Get posts from MySQL database.
+    dbtag = tag to call
+    myconfig = configuration settings for MySQL db
+    postlimit = limit prolific authors
+    """
 
+    
     #Grab configs:
     config = ConfigParser.RawConfigParser()
     config.read(myconfig) 
@@ -76,61 +102,72 @@ def get_train_dfs(dbtag,myconfig,postlimit=True):
     #DB connection:
     #con = mdb.connect('localhost', db_username, db_pwd, 'testdb')
     con = mdb.connect('localhost', db_username, db_pwd, 'InsightData')
-    
+
+    #Query spoilers
     query = 'SELECT * FROM tumblr_%s_spoil' % dbtag
     df_spo = pd.read_sql(query, con)
-    
+
+    #Query regular
     query = 'SELECT * FROM tumblr_%s_regular' % dbtag
     df_tot = pd.read_sql(query, con)
-    
+
+    #Clean out spoiler posts from regular:
     df_tot = df_tot[df_tot.apply(is_spoil,axis=1)]
     df_tot = df_tot[df_tot.apply(has_spoil,axis=1)]
-        
+
+    #Remove word spoiler from regular posts and clean tags:
     df_tot['alltext'] = df_tot['alltext'].apply(snipspo)
     words_tot = np.asarray(df_tot['alltext'])
     class_tot = np.zeros(words_tot.shape[0])
     df_tot['taglist'] = df_tot['taglist'].apply(clean_tags)
 
+    #Remove word spoiler from spoiler posts and clean tags:
     df_spo['alltext'] = df_spo['alltext'].apply(snipspo)
     words_spo = np.asarray(df_spo['alltext'])
     class_spo = np.ones(words_spo.shape[0])
     df_spo['taglist'] = df_spo['taglist'].apply(clean_tags)
-    
+
+    #Some weights:
     wtot = df_tot['dtime'].sum()
     wspo = df_spo['dtime'].sum()
-    
     wval = wspo/wtot
-    
     weight_tot = np.full(words_tot.shape[0],wval,dtype=float)
     weight_spo = np.ones(words_spo.shape[0])
-    
+
+    #New columns for regular:    
     cols_tot = {'words':words_tot,'evtclass':class_tot,'w':weight_tot,\
                 'wcount':np.asarray(df_tot['count']), \
                 'id':np.asarray(df_tot['id']),  \
                 'blogname':np.asarray(df_tot['blog_name']), \
                 'timestamp':np.asarray(df_tot['timestamp']), \
                 'taglist':np.asarray(df_tot['taglist'])}
-                
+
+    #Make the dataframe for regular:
     df_new_tot = pd.DataFrame(cols_tot,index=range(1,words_tot.size+1))
 
+    #New columns for spoiler:
     cols_spo = {'words':words_spo,'evtclass':class_spo,'w':weight_spo,\
                 'wcount':np.asarray(df_spo['count']), \
                 'id':np.asarray(df_spo['id']),\
                 'blogname':np.asarray(df_spo['blog_name']), \
                 'timestamp':np.asarray(df_spo['timestamp']), \
                 'taglist':np.asarray(df_spo['taglist'])}
-                
+
+    #Make the dataframe for spoiler:
     df_new_spo = pd.DataFrame(cols_spo,index=range(words_tot.size+1,words_tot.size+words_spo.size+1))
-    
+
+    #Concat them!
     df_new = pd.concat([df_new_tot,df_new_spo])
-    
+
+    #Drop duplicates
     df_new = df_new.drop_duplicates()
-    
+
+    #Normalize the post length variable:
     avg_len = df_new['wcount'].sum()/df_new.shape[0]
     std_len = df_new['wcount'].std()
-    
     df_new['wcount'] = (df_new['wcount'] - std_len)/avg_len
 
+    #Limit prolific authors, if requested:
     if (postlimit):
        df_new = enforce_post_limit(df_new)
     
@@ -138,23 +175,31 @@ def get_train_dfs(dbtag,myconfig,postlimit=True):
 
 #Make a testing and training dataframe:
 def GenerateTestTrain(df):
-    
+    """From dataframe df, make a testing and training set
+    """
+
+    #Shuffle data:
     df = shuffle(df,random_state=15)
-    
+
+    #Do a 40% test-train split:
     X_train, X_test, y_train, y_test = cross_validation.train_test_split( \
         df[['words','w','taglist','wcount']], df['evtclass'], test_size=0.4, \
         random_state=0)
 
+    #Put x and y back together for train
     df_tr = pd.concat([X_train, y_train], axis=1, join_axes=[X_train.index])
     df_tr = df_tr.reset_index()
 
+    #Put x and y back together for test    
     df_te = pd.concat([X_test, y_test], axis=1, join_axes=[X_test.index])
     df_te = df_te.reset_index()
     
     return df_tr,df_te
 
 def get_nolist_dfs(tag,nolist,myconfig,binary=False):
-
+    """Deprecated - was meant to make pre-filter class0 set
+    """
+    
     df_ip = get_train_dfs(tag,myconfig)
     df_ip['evtclass'] = np.zeros(df_ip.shape[0])
     df_tot = df_ip.drop_duplicates()
@@ -176,7 +221,8 @@ def get_nolist_dfs(tag,nolist,myconfig,binary=False):
     return df_tot
 
 def get_all_dfs(tagslist,myconfig,binary=False):
-
+"""Get dataset for all tags in tagslist and make into single frame"""
+    
     df_tot = pd.DataFrame()
         
     for i,t in enumerate(tagslist):
@@ -188,7 +234,8 @@ def get_all_dfs(tagslist,myconfig,binary=False):
 
 
 def GenerateTestTrainFront(df,itest,downsample=True):
-
+    """Deprecated: Meant to create trained Pre-Filter Forest
+    """
     
     #print "Total size",df.shape
     
