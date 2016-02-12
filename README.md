@@ -10,3 +10,12 @@ Backup of modules and macros for my Insight Data Science SV 2016A project.
 * ***modelmaker.py***: Vocabulary and model creation, CV and training lower-level functions
 
 ### DataCollection: Data collection and cleaning (from Tumblr API)
+* ***postGather.py***: Functions to gather posts from the Tumblr API (employs [pytumblr](https://github.com/tumblr/pytumblr))
+* ***cleaners.py***: Cleaning functions
+
+### macros: Collection of ipython notebooks for analysis
+* ***AuthorTest.ipynb***: Testing effects of repeat authorship on model
+* ***DataGather.ipynb***: Gathering posts from 9 separate content sources, cleaning, and storing to MySQL database.
+* ***Model_SpoilerFilter_CV.ipynb***: Cross-validation of models and optimization of parameters.
+* ***Model_Train_PreFilter.ipynb***: Training for Pre-Filter vocabulary and check for accuracy.
+* ***Model_Train_SpoilerFilter.ipynb***: Training of Spoiler Filter, check for accuracy (ROC), with diagnostic plots.
