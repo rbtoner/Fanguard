@@ -18,6 +18,13 @@ import cleaners
 
 #Generator to grab posts from a series of hashtags:
 def PostGenerator(client, tag, timelist = [],rep = 1):
+    """Generator to get posts from Tumblr API.
+    client = tumblr client
+    tag = tag to search for
+    timelist = times to search at
+    rep = repetition rate, if using timelist
+    """
+    
     #Grab 20 or less:
     chunk=20
     #Just a counter:
@@ -32,17 +39,20 @@ def PostGenerator(client, tag, timelist = [],rep = 1):
     #For as long as we need to:
     while True:
 
+        #If we're using a timelist, and it's time for a new timestamp:
         if (i%rep==0) and (len(timelist)>0):
 
+            #We've run past the stamp!
             if (last_stamp < timelist[j]):
                 print "WARNING: %d < %d; will later drop duplicates" \
                     % (last_stamp,timelist[j])
 
+            #New last stamp:
             new_before = timelist[j] - 1
-            j += 1
+            j += 1 #Increment
 
         else:
-            new_before = last_stamp
+            new_before = last_stamp #New last stamp
 
         #Print out some progress every 20 calls:
         if (i%20)==0:
@@ -77,7 +87,14 @@ def PostGenerator(client, tag, timelist = [],rep = 1):
         
 
 def GeneratePosts(tag,dbname,reprate,myconfig):
+    """Generate posts for a given tag and insert them into database
+    tag = tag to search for
+    dbname = database name stub
+    reprate = reprate for sampling "all" tag
+    myconfig = MySQL configurations
+    """
 
+    #Get MySQL configurations:
     config = ConfigParser.RawConfigParser()
     config.read(myconfig) 
 
@@ -85,11 +102,13 @@ def GeneratePosts(tag,dbname,reprate,myconfig):
     db_username = config.get('DB', 'username')
     db_pwd = config.get('DB', 'pwd')
 
+    #Tumblr Key Info:
     consumer_key = config.get('tcred', 'consumer_key')
     consumer_secret = config.get('tcred', 'consumer_secret')
     oauth_token = config.get('tcred', 'oauth_token')
     oauth_secret = config.get('tcred', 'oauth_secret')
-    
+
+    #Get the client:
     client = pytumblr.TumblrRestClient(consumer_key,consumer_secret, \
         oauth_token, oauth_secret)
     
